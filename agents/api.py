@@ -1,12 +1,14 @@
 """
 FastAPI REST API Server for Protocol Deviation Auditor Agent.
 """
+import time
 from typing import Dict, Any, List
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel
-from .base import AuditLogger, PHIGuard
+from .base import AuditLogger, PHIGuard, SecurityException
 from .models import SystemTaskPayload, ConsensusDossier
 from .supervisor import SystemSupervisor
+from .metrics import GLOBAL_METRICS
 
 supervisor = SystemSupervisor(model_provider="mock")
 
@@ -28,6 +30,16 @@ def health():
 
 @app.get("/metrics")
 def metrics():
+    """Prometheus-compatible metrics endpoint."""
+    return Response(
+        content=GLOBAL_METRICS.export_prometheus_text(),
+        media_type="text/plain; version=0.0.4; charset=utf-8"
+    )
+
+
+@app.get("/api/metrics/json")
+def metrics_json():
+    """JSON metrics endpoint for dashboards."""
     return {
         "dossiers_processed_total": len(supervisor.dossier_registry),
         "audit_blocks_total": len(AuditLogger.get_trail()),
@@ -37,8 +49,18 @@ def metrics():
 
 @app.post("/api/audit")
 def api_audit(payload: SystemTaskPayload):
-    dossier = supervisor.process_task(payload)
-    return dossier.to_dict()
+    start = time.time()
+    try:
+        PHIGuard.assert_no_phi(payload.task_id)
+        PHIGuard.assert_no_phi(payload.target_identifier)
+        PHIGuard.assert_no_phi(payload.status_descriptor)
+        dossier = supervisor.process_task(payload)
+        duration = time.time() - start
+        GLOBAL_METRICS.record_task(dossier.overall_urgency.value, duration)
+        return dossier.to_dict()
+    except SecurityException as e:
+        GLOBAL_METRICS.record_phi_block()
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @app.post("/api/chat")

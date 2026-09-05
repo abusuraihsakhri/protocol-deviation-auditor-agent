@@ -4,12 +4,40 @@ Command Line Interface for Protocol Deviation Auditor Agent.
 import argparse
 import csv
 import json
+import os
+import re
 import sys
+from pathlib import Path
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
-from agents.base import AuditLogger
+from agents.base import AuditLogger, SecurityException
 
 supervisor = SystemSupervisor(model_provider="mock")
+
+
+def _safe_resolve_path(file_path: str, must_exist: bool = False) -> Path:
+    """Resolve a path safely, preventing directory traversal outside CWD."""
+    cwd = Path.cwd().resolve()
+    resolved = (cwd / file_path).resolve()
+    # Prevent path traversal: resolved path must be within CWD
+    if not str(resolved).startswith(str(cwd) + os.sep) and resolved != cwd:
+        raise SecurityException(f"Path traversal blocked: '{file_path}' escapes working directory")
+    if must_exist and not resolved.is_file():
+        raise FileNotFoundError(f"Input file not found: '{file_path}'")
+    return resolved
+
+
+def _sanitize_id(value: str, field_name: str, max_len: int = 128) -> str:
+    """Sanitize identifier fields to prevent injection."""
+    if not value or not value.strip():
+        raise SecurityException(f"{field_name} cannot be empty")
+    cleaned = value.strip()
+    if len(cleaned) > max_len:
+        raise SecurityException(f"{field_name} exceeds maximum length of {max_len}")
+    # Block control characters and path separators
+    if re.search(r'[\x00-\x1f\x7f\\/:*?"<>|]', cleaned):
+        raise SecurityException(f"{field_name} contains invalid characters")
+    return cleaned
 
 
 def main(argv=None):
@@ -46,11 +74,11 @@ def main(argv=None):
 
     if args.command == "audit":
         payload = SystemTaskPayload(
-            task_id=args.task_id,
-            target_identifier=args.target,
+            task_id=_sanitize_id(args.task_id, "task_id"),
+            target_identifier=_sanitize_id(args.target, "target_identifier"),
             primary_metric=args.primary,
             secondary_metric=args.secondary,
-            status_descriptor=args.status,
+            status_descriptor=_sanitize_id(args.status, "status_descriptor"),
             is_critical_flag=args.critical,
         )
         dossier = supervisor.process_task(payload)
@@ -80,7 +108,10 @@ def main(argv=None):
         return 0
 
     if args.command == "batch":
-        with open(args.input, mode="r", encoding="utf-8-sig") as f:
+        in_path = _safe_resolve_path(args.input, must_exist=True)
+        out_path = _safe_resolve_path(args.output)
+
+        with open(in_path, mode="r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             fieldnames = list(reader.fieldnames or [])
             rows = list(reader)
@@ -89,12 +120,12 @@ def main(argv=None):
         out_rows = []
         for r in rows:
             payload = SystemTaskPayload(
-                task_id=r.get("task_id", "TASK-01"),
-                target_identifier=r.get("target_identifier", "TARGET-01"),
+                task_id=_sanitize_id(str(r.get("task_id", "TASK-01")), "task_id"),
+                target_identifier=_sanitize_id(str(r.get("target_identifier", "TARGET-01")), "target_identifier"),
                 primary_metric=float(r.get("primary_metric", 15.0)),
                 secondary_metric=float(r.get("secondary_metric", 5.0)),
-                status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
+                status_descriptor=_sanitize_id(str(r.get("status_descriptor", "NOMINAL")), "status_descriptor"),
+                is_critical_flag=str(r.get("is_critical_flag", "False")).lower() in ("true", "1", "yes"),
             )
             dossier = supervisor.process_task(payload)
             row_dict = dict(r)
@@ -104,11 +135,11 @@ def main(argv=None):
             row_dict["audit_hash"] = dossier.audit_hash
             out_rows.append(row_dict)
 
-        with open(args.output, mode="w", encoding="utf-8", newline="") as f:
+        with open(out_path, mode="w", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=out_fields)
             writer.writeheader()
             writer.writerows(out_rows)
-        print(f"Processed {len(out_rows)} records -> {args.output}")
+        print(f"Processed {len(out_rows)} records -> {out_path}")
         return 0
 
     if args.command == "serve":

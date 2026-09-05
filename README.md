@@ -30,38 +30,67 @@ Protocol Deviation Auditor Agent
 
 ---
 
-## 💻 CLI Quickstart & Usage
+## 🔧 Configuration
 
-### 1. Guided Interactive Mode
+The application requires an HMAC-SHA256 audit secret key. Set it via environment variable:
+
 ```bash
-python cli.py
+# Linux/macOS
+export AUDIT_SECRET_KEY="your-secure-random-key-min-16-chars"
+
+# Windows
+set AUDIT_SECRET_KEY=your-secure-random-key-min-16-chars
 ```
 
-### 2. Direct Parameterized Evaluation
+Or copy `.env.example` to `.env` and set it there for Docker deployments.
+
+## 💻 CLI Quickstart & Usage
+
+### 1. Single Task Evaluation
 ```bash
-python cli.py --task-id <value> --target <value> --primary <value> --secondary <value>
+python cli.py audit --task-id TASK-001 --target KEY-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
+```
+
+### 2. Batch CSV Processing
+```bash
+python cli.py batch -i sample.csv -o results.csv
+```
+
+### 3. Supervisory Chat
+```bash
+python cli.py chat "What is the system status?"
+```
+
+### 4. Verify Audit Trail Integrity
+```bash
+python cli.py verify-audit
+```
+
+### 5. Launch REST API Server
+```bash
+python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
 ### Parameter Reference
-- `--task-id`: Specifies input measurement or parameter value.
-- `--target`: Specifies input measurement or parameter value.
-- `--primary`: Specifies input measurement or parameter value.
-- `--secondary`: Specifies input measurement or parameter value.
-- `--critical`: Specifies input measurement or parameter value.
-- `--status`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
+- `--task-id`: Unique task/case identifier (required for audit)
+- `--target`: Target entity or specimen identifier
+- `--primary`: Primary measurement value (float)
+- `--secondary`: Secondary measurement value (float)
+- `--critical`: Flag for critical/emergency escalation
+- `--status`: Status descriptor (e.g., NOMINAL, DISCORDANT, ANOMALY)
+- `-i/--input`: Input CSV file path (for batch mode)
+- `-o/--output`: Output CSV file path (for batch mode)
 
 ### Input Data Schema
 
 | Field | Description | Requirement |
 |:------|:------------|:------------|
-| `task_id` | Parameter / observation metric | Required |
-| `target_identifier` | Parameter / observation metric | Required |
-| `primary_metric` | Parameter / observation metric | Required |
-| `secondary_metric` | Parameter / observation metric | Required |
-| `is_critical_flag` | Parameter / observation metric | Required |
-| `status_descriptor` | Parameter / observation metric | Required |
+| `task_id` | Unique task/case identifier | Required |
+| `target_identifier` | Target entity or specimen identifier | Required |
+| `primary_metric` | Primary measurement value (float) | Required |
+| `secondary_metric` | Secondary measurement value (float) | Optional (default: 0.0) |
+| `is_critical_flag` | Emergency escalation flag | Optional (default: false) |
+| `status_descriptor` | Status or phenotype descriptor | Optional (default: NOMINAL) |
 
 ---
 
@@ -83,17 +112,33 @@ Run the automated test suite:
 pytest -v
 ```
 
+The test suite automatically configures the audit secret via `tests/conftest.py`.
+
 Execute high-throughput batch simulation benchmarks:
 
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python simulator.py 1000
+```
+
+Run the security audit:
+
+```bash
+python -c "from agents.base import PHIGuard, AuditLogger; print('PHI Guard & Audit:', PHIGuard.redact_phi('test'), '|', AuditLogger.verify_integrity())"
 ```
 
 ---
 
 ## 🐳 Container Deployment
 
+### Docker Compose (recommended)
+```bash
+cp .env.example .env
+# Edit .env to set a secure AUDIT_SECRET_KEY
+docker-compose up --build
+```
+
+### Docker directly
 ```bash
 docker build -t protocol-deviation-auditor-agent .
-docker run -p 8000:8000 protocol-deviation-auditor-agent
+docker run -e AUDIT_SECRET_KEY="your-secure-key-here" -p 8000:8000 protocol-deviation-auditor-agent
 ```

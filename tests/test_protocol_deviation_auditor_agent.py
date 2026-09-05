@@ -3,16 +3,17 @@ Automated Pytest Test Suite for Protocol Deviation Auditor Agent.
 Domain: Clinical & Biomedical AI
 Standard: CAP / CLSI / ISO Standards
 """
+import os
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import pytest
-from agents.base import PHIGuard, AuditLogger, SecurityException
+from agents.base import PHIGuard, AuditLogger, AuditTrail, SecurityException
 from agents.models import SystemTaskPayload, UrgencyLevel, SystemIntegrityStatus
 from agents.workers import InvariantQCWorker, SafetyEscalationWorker, ProtocolConformanceWorker
 from agents.supervisor import SystemSupervisor
-from cli import main
+from cli import main, _sanitize_id, _safe_resolve_path
 
 
 def test_phi_guard_enforcement():
@@ -21,6 +22,13 @@ def test_phi_guard_enforcement():
 
     # Clean text passes
     PHIGuard.assert_no_phi("Analytical assay specimen KEY-001 optimal")
+
+
+def test_phi_redaction():
+    redacted = PHIGuard.redact_phi("Contact patient at 555-123-4567 or test@example.com")
+    assert "555-123-4567" not in redacted
+    assert "test@example.com" not in redacted
+    assert "[REDACTED_IDENTIFIER]" in redacted
 
 
 def test_specialized_workers():
@@ -63,3 +71,49 @@ def test_supervisor_consensus_and_audit():
     assert main(["audit", "--task-id", "CLI-TEST-01"]) == 0
     assert main(["chat", "Explain", "specifications"]) == 0
     assert main(["verify-audit"]) == 0
+
+
+def test_audit_trail_requires_secret():
+    """AuditTrail must reject empty/missing secret keys."""
+    with pytest.raises(SecurityException):
+        AuditTrail(secret_key="")
+    with pytest.raises(SecurityException):
+        AuditTrail(secret_key="short")
+
+
+def test_audit_trail_chaining():
+    """Audit trail entries must form a valid hash chain."""
+    trail = AuditTrail(secret_key="test-key-for-chaining-validation-2026")
+    trail.log("test", "unit", "TEST_EVENT", {"data": "block1"})
+    trail.log("test", "unit", "TEST_EVENT", {"data": "block2"})
+    trail.log("test", "unit", "TEST_EVENT", {"data": "block3"})
+    assert len(trail.get_trail()) == 3
+    assert trail.verify_integrity() is True
+
+
+def test_sanitize_id_validation():
+    """Input sanitization must reject dangerous characters."""
+    assert _sanitize_id("valid-id-123", "test") == "valid-id-123"
+    with pytest.raises(SecurityException):
+        _sanitize_id("", "test")
+    with pytest.raises(SecurityException):
+        _sanitize_id("has/slash", "test")
+    with pytest.raises(SecurityException):
+        _sanitize_id("has:colon", "test")
+    with pytest.raises(SecurityException):
+        _sanitize_id("has*asterisk", "test")
+    with pytest.raises(SecurityException):
+        _sanitize_id("a" * 200, "test")
+
+
+def test_path_traversal_protection():
+    """Path resolution must prevent directory traversal."""
+    # Valid relative path should work
+    p = _safe_resolve_path("sample.csv", must_exist=True)
+    assert p.name == "sample.csv"
+
+    # Path traversal should be blocked
+    with pytest.raises(SecurityException):
+        _safe_resolve_path("../../../etc/passwd")
+    with pytest.raises(SecurityException):
+        _safe_resolve_path("/etc/passwd")

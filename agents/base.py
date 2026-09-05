@@ -8,6 +8,7 @@ import json
 import time
 import hmac
 import hashlib
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
@@ -54,10 +55,32 @@ class PHIGuard:
         return res
 
 
+def _resolve_audit_secret(secret_key: Optional[str] = None) -> str:
+    """Resolve audit secret from explicit value, env var, or Docker secret file."""
+    if secret_key is not None:
+        if len(secret_key) < 16:
+            raise SecurityException("Audit secret key must be at least 16 characters long.")
+        return secret_key
+    env_key = os.getenv("AUDIT_SECRET_KEY")
+    if env_key and env_key.strip():
+        if len(env_key.strip()) < 16:
+            raise SecurityException("AUDIT_SECRET_KEY must be at least 16 characters long.")
+        return env_key.strip()
+    secret_file = os.getenv("AUDIT_SECRET_KEY_FILE")
+    if secret_file and os.path.isfile(secret_file):
+        file_content = Path(secret_file).read_text(encoding="utf-8").strip()
+        if file_content:
+            return file_content
+    raise SecurityException(
+        "AUDIT_SECRET_KEY environment variable (or AUDIT_SECRET_KEY_FILE) is required. "
+        "Set it before running the application."
+    )
+
+
 class AuditTrail:
     """Cryptographic Tamper-Evident HMAC-SHA256 Audit Trail."""
     def __init__(self, secret_key: Optional[str] = None):
-        self.secret_key = (secret_key or os.getenv("AUDIT_SECRET_KEY", "protocol-deviation-auditor-agent-master-audit-key-2026")).encode("utf-8")
+        self.secret_key = _resolve_audit_secret(secret_key).encode("utf-8")
         self.logs: List[Dict[str, Any]] = []
 
     def log(self, actor: str, actor_tier: str, event_type: str, details: Dict[str, Any]) -> Dict[str, Any]:
@@ -108,11 +131,3 @@ class AuditLogger:
     @staticmethod
     def verify_integrity() -> bool:
         return GLOBAL_AUDIT.verify_integrity()
-
-
-class ActionExecutor:
-    @staticmethod
-    def execute_with_audit(actor: str, actor_tier: str, action_type: str, fn, *args, **kwargs):
-        res = fn(*args, **kwargs)
-        AuditLogger.log(actor, actor_tier, action_type, {"status": "SUCCESS"})
-        return res
