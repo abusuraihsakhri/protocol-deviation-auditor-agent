@@ -104,7 +104,7 @@ class AuditTrail:
             audit_id = f"AUDIT-{int(time.time()*1000)}-{len(self.logs)+1}"
             ts = datetime.now(timezone.utc).isoformat()
             prev_hash = self.logs[-1]["current_hash"] if self.logs else self.GENESIS
-            sign_string = f"{audit_id}|{ts}|{actor}|{actor_tier}|{event_type}|{payload_hash}|{prev_hash}"
+            sign_string = json.dumps([audit_id, ts, actor, actor_tier, event_type, payload_hash, prev_hash], separators=(",", ":"), ensure_ascii=False)
             signature = hmac.new(self.secret_key, sign_string.encode("utf-8"), hashlib.sha256).hexdigest()
             entry = {
                 "audit_id": audit_id,
@@ -126,10 +126,11 @@ class AuditTrail:
                 for entry in self.logs:
                     if entry["prev_hash"] != previous:
                         return False
-                    sign_string = (
-                        f'{entry["audit_id"]}|{entry["timestamp"]}|{entry["actor"]}|'
-                        f'{entry["actor_tier"]}|{entry["event_type"]}|'
-                        f'{entry["payload_hash"]}|{entry["prev_hash"]}'
+                    sign_string = json.dumps(
+                        [entry["audit_id"], entry["timestamp"], entry["actor"],
+                         entry["actor_tier"], entry["event_type"], entry["payload_hash"],
+                         entry["prev_hash"]],
+                        separators=(",", ":"), ensure_ascii=False,
                     )
                     expected = hmac.new(self.secret_key, sign_string.encode("utf-8"), hashlib.sha256).hexdigest()
                     if not hmac.compare_digest(expected, entry["current_hash"]):
