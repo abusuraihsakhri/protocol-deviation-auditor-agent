@@ -4,24 +4,33 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "protocol-deviation-auditor-engine"
-version = "2.0.0"
+version = "2.0.1"
 description = "ICH-GCP Protocol Deviation & Good Clinical Practice Auditor Engine"
 readme = "README.md"
 authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Security/Cryptography",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.9"
-dependencies = []
+dependencies = ["pydantic>=2.0,<3"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.110,<1", "uvicorn>=0.24,<1"]
+test = ["pytest>=7,<10", "httpx>=0.27,<1"]
 
 [project.scripts]
 protocol-deviation-auditor-engine = "gcp_protocol_auditor.cli:main"
+protocol-deviation-auditor = "cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/protocol-deviation-auditor-engine"
-Repository = "https://github.com/abusuraihsakhri/protocol-deviation-auditor-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/protocol-deviation-auditor-agent"
+Repository = "https://github.com/abusuraihsakhri/protocol-deviation-auditor-agent.git"
+
+[tool.setuptools]
+py-modules = ["cli", "enrichment", "simulator", "gcp_protocol_auditor_app"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "gcp_protocol_auditor*"]
