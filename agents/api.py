@@ -16,8 +16,8 @@ supervisor = SystemSupervisor(model_provider="mock")
 
 app = FastAPI(
     title="Protocol Deviation Auditor Agent API",
-    description="Enterprise Distributed Component Platform (Clinical & Biomedical AI)",
-    version="3.0.0-ENTERPRISE",
+    description="Illustrative threshold evaluator. Not validated for clinical or GCP determinations.",
+    version="2.0.1",
 )
 
 
@@ -27,7 +27,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "HEALTHY", "service": "protocol-deviation-auditor-agent", "domain": "Clinical & Biomedical AI", "standard": "CAP / CLSI / ISO Standards", "version": "3.0.0-ENTERPRISE"}
+    return {"status": "HEALTHY", "service": "protocol-deviation-auditor-agent", "domain": "Clinical & Biomedical AI", "standard": "Illustrative rules; no validated standard mapping", "version": "2.0.1"}
 
 
 @app.get("/metrics")
@@ -45,7 +45,7 @@ def metrics_json():
     return {
         "dossiers_processed_total": len(supervisor.dossier_registry),
         "audit_blocks_total": len(AuditLogger.get_trail()),
-        "system_status": "NOMINAL_OPTIMAL"
+        "system_status": "DEMO"
     }
 
 
