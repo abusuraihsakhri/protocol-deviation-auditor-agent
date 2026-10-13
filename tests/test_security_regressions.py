@@ -20,6 +20,15 @@ def test_audit_entry_signature_is_checked_not_just_linkage():
     assert not trail.verify_integrity()
 
 
+def test_audit_metadata_delimiter_cannot_be_reassigned():
+    trail = AuditTrail(secret_key="testing-signature-integrity-key-2026")
+    trail.log("actor|tier", "unit", "START", {"task_id": "DEMO-001"})
+    assert trail.verify_integrity()
+    trail.logs[0]["actor"] = "actor"
+    trail.logs[0]["actor_tier"] = "tier|unit"
+    assert not trail.verify_integrity()
+
+
 def test_audit_readers_receive_defensive_copies():
     trail = AuditTrail(secret_key="testing-signature-integrity-key-2026")
     receipt = trail.log("system", "worker", "START", {"task_id": "DEMO-001"})
