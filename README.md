@@ -6,7 +6,14 @@ An example-rule evaluator for synthetic clinical-trial operational data. The rep
 
 ## Browser demonstration
 
-Open `web/index.html` in a modern browser or use the published static site when available. Enter **only synthetic IDs and values**, run the example rules, inspect alerts, and optionally download the JSON result.
+Serve the `web/` directory locally or use the published static site when available:
+
+```bash
+python -m http.server 8001 --directory web
+# Open http://localhost:8001/
+```
+
+ES modules may be blocked when opening the HTML directly through `file://`. Enter **only synthetic IDs and values**, run the example rules, inspect alerts, and optionally download the JSON result.
 
 - Runs directly in JavaScript; **no Python runtime or backend connection** is required.
 - Primary metric above **25**: elevated warning.
