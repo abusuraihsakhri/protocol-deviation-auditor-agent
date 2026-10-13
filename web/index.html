@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Protocol Deviation Auditor Engine — Operations Console</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'">
     <style>
         :root {
             --bg: #090d16;
@@ -109,6 +109,16 @@
             gap: 1rem;
             margin-bottom: 1.5rem;
         }
+        input[type="checkbox"] { width: auto; margin-right: .5rem; }
+        .card button + button { margin-top: .75rem; }
+        .btn:disabled { opacity: .45; cursor: not-allowed; }
+        .terminal { margin-bottom: 1rem; overflow-wrap: anywhere; }
+        @media (max-width: 800px) {
+            body { padding: 1rem; }
+            .grid { grid-template-columns: 1fr; }
+            .metrics-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .header { flex-wrap: wrap; gap: 1rem; }
+        }
         .metric-box {
             background: var(--card);
             border: 1px solid var(--border);
@@ -125,112 +135,69 @@
     <div class="header">
         <div class="header-title">
             <h1>Protocol Deviation Auditor Engine</h1>
-            <p>Domain: Clinical & Cryptographic AI | Standard: CAP / CLSI / NIST Standards | LabMind-Atlas Architecture</p>
+            <p>Browser-only example rules. Not a clinical, regulatory, or protocol-compliance assessment.</p>
         </div>
         <div>
-            <span class="badge">Air-Gapped Active</span>
-            <span class="badge" style="background: rgba(16,185,129,0.2); color: #10b981; border-color: #10b981;">Zero-PHI Guard Active</span>
+            <span class="badge">Runs locally in your browser</span>
+            <span class="badge" style="background: rgba(16,185,129,0.2); color: #10b981; border-color: #10b981;">Synthetic data only — do not enter personal information</span>
         </div>
     </div>
 
     <div class="metrics-bar">
         <div class="metric-box">
             <div class="metric-label">System Status</div>
-            <div class="metric-val" style="color: var(--success);" id="m-status">OPTIMAL</div>
+            <div class="metric-val" style="color: var(--success);" id="m-status">NOT RUN</div>
         </div>
         <div class="metric-box">
             <div class="metric-label">Tasks Processed</div>
-            <div class="metric-val" id="m-tasks">142</div>
+            <div class="metric-val" id="m-tasks">0</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">Audit Blocks Signed</div>
-            <div class="metric-val" id="m-audit">142</div>
+            <div class="metric-label">Alerts in last run</div>
+            <div class="metric-val" id="m-audit">0</div>
         </div>
         <div class="metric-box">
-            <div class="metric-label">PHI Interceptions</div>
-            <div class="metric-val" style="color: var(--accent);" id="m-phi">0</div>
+            <div class="metric-label">Network uploads</div>
+            <div class="metric-val" style="color: var(--accent);" id="m-phi">NONE</div>
         </div>
     </div>
 
     <div class="grid">
-        <div class="card">
-            <h2>⚙️ Dispatch Distributed Component Audit</h2>
+        <form class="card" id="audit-form">
+            <h2>Run example rule evaluation</h2>
             <div class="form-group">
-                <label>Task / Sample ID</label>
+                <label for="task_id">Task / Synthetic sample ID</label>
                 <input type="text" id="task_id" value="TASK-2026-LIVE-01">
             </div>
             <div class="form-group">
-                <label>Target Identifier</label>
+                <label for="target_id">Synthetic target identifier</label>
                 <input type="text" id="target_id" value="SPECIMEN-ALPHA-77">
             </div>
             <div class="form-group">
-                <label>Primary Measurement / Value</label>
+                <label for="primary_metric">Example primary metric (bound: 25)</label>
                 <input type="number" id="primary_metric" value="29.4" step="0.1">
             </div>
             <div class="form-group">
-                <label>Secondary Metric / Kinetic Index</label>
+                <label for="secondary_metric">Example secondary metric (bound: 12)</label>
                 <input type="number" id="secondary_metric" value="14.8" step="0.1">
             </div>
             <div class="form-group">
-                <label>Status / Phenotype Descriptor</label>
+                <label for="status_descriptor">Status descriptor</label>
                 <input type="text" id="status_descriptor" value="DISCORDANT_ANOMALY">
             </div>
             <div class="form-group">
-                <label><input type="checkbox" id="is_critical" checked> Trigger Emergency / Critical Flag</label>
+                <label for="is_critical"><input type="checkbox" id="is_critical"> Example critical flag</label>
             </div>
-            <button class="btn" onclick="runAudit()">Execute Distributed Component Audit</button>
-        </div>
+            <button class="btn" type="submit">Evaluate example rules</button>
+        </form>
 
         <div class="card">
-            <h2>📊 Real-Time Consensus Dossier & Audit Log</h2>
-            <div class="terminal" id="outputConsole">// Protocol Deviation Auditor Engine Operations Console Ready
-// Connection established with Air-Gapped Supervisor
-// Cryptographic HMAC-SHA256 audit ledger loaded.
-// Ready for live task payload dispatch...</div>
+            <h2>Rule evaluation output</h2>
+            <pre class="terminal" id="outputConsole" role="status" aria-live="polite">Enter synthetic values and run the rule evaluation. No HMAC audit record is created.</pre>
+            <button class="btn" id="export-json" type="button" disabled>Download result as JSON</button>
         </div>
     </div>
 
-    <script>
-        async function runAudit() {
-            const consoleEl = document.getElementById('outputConsole');
-            consoleEl.innerText = "// Dispatching task across specialized workers...
-// Invoking InvariantQCWorker, SafetyEscalationWorker, ProtocolWorker...";
-
-            const payload = {
-                task_id: document.getElementById('task_id').value,
-                target_identifier: document.getElementById('target_id').value,
-                primary_metric: parseFloat(document.getElementById('primary_metric').value),
-                secondary_metric: parseFloat(document.getElementById('secondary_metric').value),
-                status_descriptor: document.getElementById('status_descriptor').value,
-                is_critical_flag: document.getElementById('is_critical').checked
-            };
-
-            try {
-                const res = await fetch('/api/audit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                consoleEl.innerText = JSON.stringify(data, null, 2);
-                document.getElementById('m-tasks').innerText = parseInt(document.getElementById('m-tasks').innerText) + 1;
-                document.getElementById('m-audit').innerText = parseInt(document.getElementById('m-audit').innerText) + 1;
-            } catch (err) {
-                consoleEl.innerText = "// Offline / Simulation Output:\n" + JSON.stringify({
-                    dossier_id: "DOSSIER-SIM-" + Math.floor(Math.random()*10000),
-                    system: "protocol-deviation-auditor-engine",
-                    domain: "Clinical & Cryptographic AI",
-                    task_id: payload.task_id,
-                    overall_urgency: payload.is_critical_flag ? "CRITICAL_STAT_PANIC" : "ELEVATED_RISK",
-                    integrity_status: "DISCORDANT_ANOMALY",
-                    alerts: [
-                        { worker: "InvariantQCWorker", alert: "Primary metric exceeds upper reference bound" },
-                        { worker: "SafetyEscalationWorker", alert: "Critical emergency interlock flag active" }
-                    ],
-                    audit_hash: "HMAC_SHA256_e83f9a72b941d6c381f9"
-                }, null, 2);
-            }
-        }
-    </script>
+    <script type="module" src="./audit.mjs"></script>
 </body>
 </html>
