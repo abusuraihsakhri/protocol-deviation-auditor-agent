@@ -1,144 +1,65 @@
 # Protocol Deviation Auditor Agent
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+An example-rule evaluator for synthetic clinical-trial operational data. The repository contains a Python CLI, REST API, a legacy ICH-GCP-themed evaluator, and a **fully local browser demonstration**.
 
-<div align="center">
+**Scope:** This software is a prototype, not a validated GCP compliance, clinical decision-support, or medical-device tool. The numeric boundaries and descriptor keywords are examples from the source code, **not** visit-window, eligibility, investigational-product, or adverse-event rules derived from a study protocol. The older engine cites ICH E6(R2); [ICH E6(R3)](https://www.ema.europa.eu/en/scientific-guidelines/ich-e6-good-clinical-practice) is the newer guideline. Neither version is implemented as a comprehensive ruleset.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+## Browser demonstration
 
-</div>
+Open `web/index.html` in a modern browser or use the published static site when available. Enter **only synthetic IDs and values**, run the example rules, inspect alerts, and optionally download the JSON result.
 
----
+- Runs directly in JavaScript; **no Python runtime or backend connection** is required.
+- Primary metric above **25**: elevated warning.
+- Secondary metric above **12**: elevated warning; the explicit critical flag takes precedence.
+- Status descriptors containing `DISCORDANT`, `ANOMALY`, `MUTANT`, `VIOLATION`, `FAIL`, or `REJECT`: elevated warning.
+- This page produces **no cryptographically signed audit trail**. Counters are for the current page session only.
 
-## 📖 What It Does
+## Python CLI and API
 
-Protocol Deviation Auditor Agent
-
----
-
-## ⚙️ Key Capabilities & Algorithmic Modules
-
-- **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
-- **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
-- **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
-
----
-
-## 🔧 Configuration
-
-The application requires an HMAC-SHA256 audit secret key. Set it via environment variable:
+Requires Python 3.10–3.12 for the tested workflow. Install from the repository:
 
 ```bash
-# Linux/macOS
-export AUDIT_SECRET_KEY="your-secure-random-key-min-16-chars"
-
-# Windows
-set AUDIT_SECRET_KEY=your-secure-random-key-min-16-chars
-```
-
-Or copy `.env.example` to `.env` and set it there for Docker deployments.
-
-## 💻 CLI Quickstart & Usage
-
-### 1. Single Task Evaluation
-```bash
-python cli.py audit --task-id TASK-001 --target KEY-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-```
-
-### 2. Batch CSV Processing
-```bash
-python cli.py batch -i sample.csv -o results.csv
-```
-
-### 3. Supervisory Chat
-```bash
-python cli.py chat "What is the system status?"
-```
-
-### 4. Verify Audit Trail Integrity
-```bash
+python -m pip install -e ".[api,test]"
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+python cli.py audit --task-id DEMO-001 --target SYNTHETIC-01 --primary 28.5 --secondary 14.2 --status DISCORDANT
+python cli.py batch --input sample.csv --output results.csv
 python cli.py verify-audit
-```
-
-### 5. Launch REST API Server
-```bash
 python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-### Parameter Reference
-- `--task-id`: Unique task/case identifier (required for audit)
-- `--target`: Target entity or specimen identifier
-- `--primary`: Primary measurement value (float)
-- `--secondary`: Secondary measurement value (float)
-- `--critical`: Flag for critical/emergency escalation
-- `--status`: Status descriptor (e.g., NOMINAL, DISCORDANT, ANOMALY)
-- `-i/--input`: Input CSV file path (for batch mode)
-- `-o/--output`: Output CSV file path (for batch mode)
+On Windows, set `AUDIT_SECRET_KEY` in your environment using the shell's appropriate syntax. The API documents its endpoints at `http://127.0.0.1:8000/docs`, including `POST /api/audit`, `POST /api/chat`, `GET /health`, and `GET /metrics`.
 
-### Input Data Schema
+`GET /api/audit/logs` returns **403 by default**. To enable audit metadata retrieval, set an unpredictable `AUDIT_LOGS_TOKEN` and send its value in the `X-Audit-Token` request header. Do not publish this service to the Internet without additional authentication, TLS and an appropriate security review.
 
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `task_id` | Unique task/case identifier | Required |
-| `target_identifier` | Target entity or specimen identifier | Required |
-| `primary_metric` | Primary measurement value (float) | Required |
-| `secondary_metric` | Secondary measurement value (float) | Optional (default: 0.0) |
-| `is_critical_flag` | Emergency escalation flag | Optional (default: false) |
-| `status_descriptor` | Status or phenotype descriptor | Optional (default: NOMINAL) |
+The `agents/` implementation powers `cli.py` and `agents.api`. The `gcp_protocol_auditor/` implementation is a separate legacy evaluator, accessible via `python -m gcp_protocol_auditor.cli` or the installed `protocol-deviation-auditor-engine` entry point. Their thresholds and output formats differ; they should not be treated as interchangeable.
 
----
+## Privacy and audit limitations
 
-## 🛡️ Security & Enterprise Architecture
+- **Never enter patient data or PHI.** The Python service performs limited, pattern-based identifier screening, which is **not** HIPAA Safe Harbor de-identification or a guarantee against PHI exposure.
+- The browser demonstration does not upload or store inputs. JSON downloads are explicitly requested by the user. No analytics or remote fonts are included.
+- The Python evaluator holds dossiers and the HMAC-chain entries **in process memory**. The signed chain covers audit metadata and a payload digest but is **not durable**, externally timestamped, or independently compliant with regulated record-keeping requirements.
+- The `AUDIT_SECRET_KEY` is required for the Python `agents/` implementation. Keep it outside source control. `.env.example` contains blank secret placeholders.
 
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+## Docker
 
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
-
-```bash
-pytest -v
-```
-
-The test suite automatically configures the audit secret via `tests/conftest.py`.
-
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py 1000
-```
-
-Run the security audit:
-
-```bash
-python -c "from agents.base import PHIGuard, AuditLogger; print('PHI Guard & Audit:', PHIGuard.redact_phi('test'), '|', AuditLogger.verify_integrity())"
-```
-
----
-
-## 🐳 Container Deployment
-
-### Docker Compose (recommended)
 ```bash
 cp .env.example .env
-# Edit .env to set a secure AUDIT_SECRET_KEY
-docker-compose up --build
+# Set AUDIT_SECRET_KEY in .env to a unique high-entropy value.
+docker compose up --build
 ```
 
-### Docker directly
+The Compose service binds to `127.0.0.1:8000` by default. The `.dockerignore` prevents `.env` and local secrets from entering the build context.
+
+## Verification
+
 ```bash
-docker build -t protocol-deviation-auditor-agent .
-docker run -e AUDIT_SECRET_KEY="your-secure-key-here" -p 8000:8000 protocol-deviation-auditor-agent
+python -m pytest -q
+node --check web/audit.mjs
+node --test tests/web.test.mjs
 ```
+
+The GitHub Actions test matrix covers Python 3.10, 3.11 and 3.12, with separate JavaScript tests. For deployment, the `Publish browser demo` workflow uploads the `web/` directory to GitHub Pages if Pages deployment is enabled in repository settings.
+
+## Technology and license
+
+Python, Pydantic 2, optional FastAPI/Uvicorn, standard-library HMAC-SHA256, and browser-native JavaScript (ES modules). The browser demonstration requires a modern Chromium, Firefox or Safari release. Licensed under [MIT](LICENSE).
